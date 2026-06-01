@@ -329,6 +329,62 @@ func TestFormat_JSON(t *testing.T) {
 	}
 }
 
+// TestRun_Unified pins the FormatUnified body shape: a standard
+// textual unified diff over each side's YAML, with `--- from`/
+// `+++ to`/`@@`/`-`/`+` lines. The Render wrapper still emits the
+// per-resource `# <header>` line above each body.
+func TestRun_Unified(t *testing.T) {
+	t.Run("modified resource emits unified-diff body", func(t *testing.T) {
+		left := []Doc{cm("a", "ns", "owner", "v1")}
+		right := []Doc{cm("a", "ns", "owner", "v2")}
+		diffs, err := Run(left, right, Options{Format: FormatUnified})
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		if len(diffs) != 1 {
+			t.Fatalf("expected 1 diff, got %d", len(diffs))
+		}
+		body := diffs[0].Diff
+		for _, want := range []string{"--- from", "+++ to", "@@", "-  k: v1", "+  k: v2"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("unified body missing %q; got:\n%s", want, body)
+			}
+		}
+		// Render must still prepend the per-resource header.
+		out, err := Render(diffs, FormatUnified)
+		if err != nil {
+			t.Fatalf("Render: %v", err)
+		}
+		if !strings.Contains(string(out), "# HelmRelease: ns/owner ConfigMap: ns/a") {
+			t.Errorf("missing per-resource header in unified output:\n%s", out)
+		}
+	})
+
+	t.Run("identical inputs still skip", func(t *testing.T) {
+		d := cm("a", "ns", "owner", "v")
+		diffs, err := Run([]Doc{d}, []Doc{d}, Options{Format: FormatUnified})
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		assert.Equal(t, len(diffs), 0)
+	})
+
+	t.Run("wholesale addition shows new content under +", func(t *testing.T) {
+		right := []Doc{cm("a", "ns", "owner", "v1")}
+		diffs, err := Run(nil, right, Options{Format: FormatUnified})
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		if len(diffs) != 1 {
+			t.Fatalf("expected 1 diff for addition, got %d", len(diffs))
+		}
+		body := diffs[0].Diff
+		if !strings.Contains(body, "+kind: ConfigMap") {
+			t.Errorf("expected added kind line; got:\n%s", body)
+		}
+	})
+}
+
 func TestResourceDiff_Header(t *testing.T) {
 	hrDiff := ResourceDiff{
 		Parent: Parent{Kind: "HelmRelease", Namespace: "media", Name: "qui"},

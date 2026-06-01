@@ -157,12 +157,12 @@ func imageSetDiff(orig, current map[string]struct{}, includeRemoved bool) []stri
 }
 
 func runDiff(cmd *cobra.Command, c *commonFlags, h *helmFlags, d *diffFlags, kind, name string) error {
-	// diff has no `name` output mode; only diff/yaml/json/markdown are
-	// meaningful. Reject early so the user sees a clear error instead
+	// diff has no `name` output mode; only diff/unified/yaml/json/markdown
+	// are meaningful. Reject early so the user sees a clear error instead
 	// of "unknown diff format" from pkg/diff. OutputMarkdown's string
 	// value matches diff.FormatMarkdown so the cast below routes it to
 	// the markdown renderer without an extra switch.
-	if err := c.requireOutput(format.Output(diff.FormatDiff), format.OutputYAML, format.OutputJSON, format.OutputMarkdown); err != nil {
+	if err := c.requireOutput(format.Output(diff.FormatDiff), format.OutputUnified, format.OutputYAML, format.OutputJSON, format.OutputMarkdown); err != nil {
 		return err
 	}
 	stopProfile, err := startProfile(c.profileMode, c.profileOut)
@@ -181,13 +181,23 @@ func runDiff(cmd *cobra.Command, c *commonFlags, h *helmFlags, d *diffFlags, kin
 		return errors.Join(fmt.Errorf("no %s named %q in --path or --path-orig", kind, name), diffRunErr)
 	}
 
+	// Body format is chosen once: unified swaps in the textual-patch
+	// renderer for each pair; every other -o value reuses the dyff
+	// body. The render-time switch in diff.Render then picks the
+	// wrapper shape (raw / yaml / json / markdown).
+	chosen := c.outputOrDefault(format.Output(diff.FormatDiff))
+	bodyFormat := diff.Format(chosen)
+	if bodyFormat != diff.FormatUnified {
+		bodyFormat = ""
+	}
 	diffs, err := diff.Run(origDocs, currentDocs, diff.Options{
 		StripAttrs: d.stripAttrs,
+		Format:     bodyFormat,
 	})
 	if err != nil {
 		return errors.Join(err, diffRunErr)
 	}
-	formatted, err := diff.Render(diffs, diff.Format(c.outputOrDefault(format.Output(diff.FormatDiff))))
+	formatted, err := diff.Render(diffs, diff.Format(chosen))
 	if err != nil {
 		return errors.Join(err, diffRunErr)
 	}

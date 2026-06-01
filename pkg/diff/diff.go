@@ -27,7 +27,15 @@ const (
 	// fence. K8s-aware: list entries are matched by identifier
 	// (container name, env-var name, etc.), so reordering a list
 	// produces no diff churn.
-	FormatDiff     Format = "diff"
+	FormatDiff Format = "diff"
+	// FormatUnified renders each pair as a standard textual unified
+	// diff (`--- from`/`+++ to`/`@@ -a,b +c,d @@`/`-`/`+` lines) over
+	// the YAML-marshaled manifest. The output applies cleanly with
+	// `git apply` / `patch`. Unlike FormatDiff, list entries are
+	// compared positionally (line by line), not by identifier — a
+	// reorder of named containers shows as a wall of +/- churn rather
+	// than the dyff `⇆ order changed` marker.
+	FormatUnified  Format = "unified"
 	FormatYAML     Format = "yaml"
 	FormatJSON     Format = "json"
 	FormatMarkdown Format = "markdown"
@@ -44,6 +52,12 @@ type Options struct {
 	// reports string-value changes verbatim, so this pre-filter still
 	// pulls its weight after the dyff swap.
 	StripAttrs []string
+	// Format selects the per-pair body renderer used by Run. The zero
+	// value (empty string) means dyff (FormatDiff/FormatYAML/FormatJSON
+	// /FormatMarkdown all consume dyff bodies). FormatUnified swaps in
+	// the unified-diff renderer so the cached body in
+	// ResourceDiff.Diff is a standard `---`/`+++`/`@@` patch.
+	Format Format
 }
 
 // Parent identifies the Flux Kustomization or HelmRelease that
@@ -109,7 +123,7 @@ func Run(left, right []Doc, opts Options) ([]ResourceDiff, error) {
 	pairs := pair(left, right)
 	out := make([]ResourceDiff, 0, len(pairs))
 	for _, p := range pairs {
-		body, err := dyffDiff(p.a, p.b)
+		body, err := diffPair(p.a, p.b, opts.Format)
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +142,7 @@ func Run(left, right []Doc, opts Options) ([]ResourceDiff, error) {
 // Render serializes a diff result set into the requested format.
 func Render(diffs []ResourceDiff, format Format) ([]byte, error) {
 	switch format {
-	case "", FormatDiff:
+	case "", FormatDiff, FormatUnified:
 		var b bytes.Buffer
 		// Emit a `# <resource>` comment line above every body. dyff's
 		// `@@ <path> @@` identifies the data path that changed but
@@ -215,6 +229,16 @@ func classifyDiff(body string) string {
 	default:
 		return "modified"
 	}
+}
+
+// diffPair renders one resource pair's body in the requested format.
+// FormatUnified produces a standard textual unified diff; every other
+// value (including the zero value) routes to the dyff renderer.
+func diffPair(a, b map[string]any, f Format) (string, error) {
+	if f == FormatUnified {
+		return unifiedDiff(a, b)
+	}
+	return dyffDiff(a, b)
 }
 
 type pairedResource struct {
