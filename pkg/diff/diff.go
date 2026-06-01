@@ -30,11 +30,15 @@ const (
 	FormatDiff Format = "diff"
 	// FormatUnified renders each pair as a standard textual unified
 	// diff (`--- from`/`+++ to`/`@@ -a,b +c,d @@`/`-`/`+` lines) over
-	// the YAML-marshaled manifest. The output applies cleanly with
-	// `git apply` / `patch`. Unlike FormatDiff, list entries are
-	// compared positionally (line by line), not by identifier — a
-	// reorder of named containers shows as a wall of +/- churn rather
-	// than the dyff `⇆ order changed` marker.
+	// the YAML-marshaled manifest. Intended for human review and for
+	// tools that consume the unified-diff line format; the output is
+	// NOT a multi-file patch (constant `from`/`to` labels, no
+	// `diff --git` framing, per-resource `# <header>` separators)
+	// and is not meant to be fed to `git apply` / `patch`. Unlike
+	// FormatDiff, list entries are compared positionally (line by
+	// line), not by identifier — a reorder of named containers shows
+	// as a wall of +/- churn rather than the dyff `⇆ order changed`
+	// marker.
 	FormatUnified  Format = "unified"
 	FormatYAML     Format = "yaml"
 	FormatJSON     Format = "json"

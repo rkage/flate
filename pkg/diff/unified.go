@@ -10,8 +10,10 @@ import (
 
 // unifiedDiff renders a single resource's diff as a standard textual
 // unified diff (`--- from`/`+++ to`/`@@ -a,b +c,d @@`/`-`/`+` lines)
-// over each side's YAML-marshaled bytes. The output applies cleanly
-// with `git apply` / `patch`.
+// over each side's YAML-marshaled bytes. Intended for human review
+// and for tools that consume the unified-diff line format; the
+// output is not framed as a real multi-file patch and is not meant
+// to be fed to `git apply` / `patch`.
 //
 // Either side may be nil to represent an added or removed resource;
 // nil marshals to the YAML empty mapping `{}\n` so both inputs are

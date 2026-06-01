@@ -23,9 +23,11 @@ const (
 	OutputJSON     Output = "json"
 	OutputName     Output = "name"
 	OutputMarkdown Output = "markdown"
-	// OutputUnified is the `diff` subcommand's unified-patch output:
-	// `--- from`/`+++ to`/`@@ -a,b +c,d @@`/`-`/`+` lines applyable
-	// with `git apply` / `patch`.
+	// OutputUnified is the `diff` subcommand's unified-diff output:
+	// `--- from`/`+++ to`/`@@ -a,b +c,d @@`/`-`/`+` lines. Intended
+	// for human review and tools that consume the unified-diff line
+	// format — NOT a real multi-file patch (no per-resource file
+	// framing), so don't feed it to `git apply` / `patch`.
 	OutputUnified Output = "unified"
 	// OutputText is the implicit default for `flate test`. The constant
 	// exists so test.go can dispatch on it explicitly rather than relying
